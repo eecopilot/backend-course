@@ -2,34 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 )
 
 type api struct {
 	addr string
 }
-
-//	func (s *api) handleRequest(w http.ResponseWriter, r *http.Request) {
-//		// fmt.Fprintf(w, "Hello, World!")
-//		// w.write([]byte("Hello, World!"))
-//		switch r.Method {
-//		case http.MethodGet:
-//			switch r.URL.Path {
-//			case "/":
-//				fmt.Fprintf(w, "Home Page")
-//			case "/about":
-//				fmt.Fprintf(w, "About Page")
-//			default:
-//				http.Error(w, "404 not found", http.StatusNotFound)
-//			}
-//		case http.MethodPost:
-//			fmt.Fprintf(w, "POST Request")
-//		default:
-//			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-//		}
-//	}
 
 var users = []User{}
 
@@ -59,13 +39,33 @@ func (a *api) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		ID:   len(users) + 1,
 		Name: payload.Name,
 	}
-	users = append(users, u)
+
+	// insert the user
+	if err := insertUser(u); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// set header
 	w.Header().Set("Content-Type", "application/json")
 
 	// write the response
 	w.WriteHeader(http.StatusCreated)
+}
+
+func insertUser(u User) error {
+	if u.Name == "" {
+		return errors.New("name is required")
+	}
+
+	// storage validation
+	for _, user := range users {
+		if user.Name == u.Name {
+			return errors.New("user already exists")
+		}
+	}
+	users = append(users, u)
+	return nil
 }
 
 func main() {
@@ -80,11 +80,12 @@ func main() {
 	}
 
 	// register the handler
-	mux.HandleFunc("GET /", api.getUserHandler)
-	mux.HandleFunc("POST /", api.createUserHandler)
+	mux.HandleFunc("GET /users", api.getUserHandler)
+	mux.HandleFunc("POST /users", api.createUserHandler)
 
 	fmt.Println("Server is running on port http://localhost:8080")
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
+		panic(err)
 	}
 }
